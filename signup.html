@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            background-color: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        .signup-container {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            width: 350px;
+        }
+
+        h2 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-size: 0.9em;
+        }
+
+        input[type="email"],
+        input[type="password"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 1em;
+        }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1em;
+            width: 100%;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        .error-message {
+            color: red;
+            font-size: 0.8em;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="signup-container">
+        <h2>Sign Up</h2>
+        <form id="signupForm">
+            <div class="form-group">
+                <label for="email">Email:</label>
+                <input type="email" id="email" name="email" required>
+                <div id="emailError" class="error-message"></div>
+            </div>
+            <div class="form-group">
+                <label for="password">Password:</label>
+                <input type="password" id="password" name="password" required>
+                <div id="passwordError" class="error-message"></div>
+            </div>
+            <button type="submit">Sign Up</button>
+        </form>
+
+
+    <script type="module">
+  // Import the functions you need from the SDKs you need
+                import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
+
+                import { getAuth, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
+
+
+                // TODO: Add SDKs for Firebase products that you want to use
+                // https://firebase.google.com/docs/web/setup#available-libraries
+
+                // Your web app's Firebase configuration
+                const firebaseConfig = {
+                    apiKey: "AIzaSyCk3NBT-ZqDYQSJVYixqt05BT4pg1Odl-4",
+                    authDomain: "admin-login-signup.firebaseapp.com",
+                    projectId: "admin-login-signup",
+                    storageBucket: "admin-login-signup.firebasestorage.app",
+                    messagingSenderId: "524139872298",
+                    appId: "1:524139872298:web:fbd21b59812e5920b40353"
+                };
+
+                // Initialize Firebase
+                const app = initializeApp(firebaseConfig);
+                const auth = getAuth(app);
+
+
+
+
+                document.getElementById('signupForm').addEventListener('submit', function(event) {
+                    event.preventDefault(); // Prevent the default form submission
+
+                    const emailInput = document.getElementById('email').value;
+                    const passwordInput = document.getElementById('password').value;
+                    const emailError = document.getElementById('emailError');
+                    const passwordError = document.getElementById('passwordError');
+
+                    let isValid = true;
+
+                    // Basic email validation
+                    if (!emailInput.includes('@')) {
+                        emailError.textContent = 'Please enter a valid email address.';
+                        isValid = false;
+                    } else {
+                        emailError.textContent = '';
+                    }
+
+                    // Basic password validation (you might want more complex rules)
+                    if (passwordInput.length < 6) {
+                        passwordError.textContent = 'Password must be at least 6 characters long.';
+                        isValid = false;
+                    } else {
+                        passwordError.textContent = '';
+                    }
+
+                    if (isValid) {
+                        // In a real application, you would send this data to a server
+                        // console.log('Email:', emailInput.value);
+                        // console.log('Password:', passwordInput.value);
+                        // alert('Sign up successful (data logged to console)!');
+                        createUserWithEmailAndPassword(auth, emailInput , passwordInput)
+                        .then((userCredential) => {
+                            const user = userCredential.user;
+                            console.log("User signed up:", user);
+                            alert("Signup successful!");
+                            location.href = "login.html";
+                        })
+                        .catch((error) => {
+                            const errorCode = error.code;
+                            const errorMessage = error.message;
+                            console.error("Signup error", errorCode, errorMessage);
+                            alert(`Signup failed: ${errorMessage}`);
+                        });
+                    }
+
+                        // Optionally redirect the user to another page
+            
+                    
+                });
+            </script>
+    </div>
+</body>
+</html>

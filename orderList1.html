@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Orders</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 20px;
+        }
+
+        h1, h2 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .order-section {
+            margin-bottom: 30px;
+            border: 1px solid #ccc;
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        .order-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px dashed #eee;
+        }
+
+        .order-item:last-child {
+            border-bottom: none;
+        }
+
+        .order-details {
+            flex-grow: 1;
+            margin-right: 10px;
+        }
+
+        .order-quantity {
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        .order-total {
+            text-align: right;
+            margin-top: 15px;
+            font-weight: bold;
+        }
+
+        #loading-message {
+            text-align: center;
+            padding: 20px;
+            font-style: italic;
+            color: #777;
+        }
+
+        #empty-orders {
+            text-align: center;
+            padding: 20px;
+            color: #555;
+        }
+
+        #error-message {
+            text-align: center;
+            padding: 20px;
+            color: red;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>Your Orders</h1>
+
+    <div id="loading-message">Loading orders...</div>
+    <div id="error-message" style="display:none;"></div>
+    <div id="orders-container" style="display:none;">
+        <div class="order-section" id="current-orders-section">
+            <h2>Current Order</h2>
+            <div id="current-orders">
+                <p id="no-current-orders">No current pending order.</p>
+            </div>
+            <p id="current-order-total" class="order-total" style="display:none;"><strong>Total: $<span id="current-total-amount">0.00</span></strong></p>
+        </div>
+
+        <div class="order-section" id="past-orders-section">
+            <h2>Past Orders</h2>
+            <div id="past-orders">
+                <p id="no-past-orders">No past orders.</p>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
+        import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
+
+        // Your Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCk3NBT-ZqDYQSJVYixqt05BT4pg1Odl-4",
+            authDomain: "admin-login-signup.firebaseapp.com",
+            projectId: "admin-login-signup",
+            storageBucket: "admin-login-signup.firebasestorage.app",
+            messagingSenderId: "524139872298",
+            appId: "1:524139872298:web:fbd21b59812e5920b40353"
+        };
+
+        try {
+            const app = initializeApp(firebaseConfig);
+            const db = getFirestore(app);
+            const auth = getAuth(app);
+
+            const loadingMessage = document.getElementById('loading-message');
+            const errorMessage = document.getElementById('error-message');
+            const ordersContainer = document.getElementById('orders-container');
+            const currentOrdersDiv = document.getElementById('current-orders');
+            const noCurrentOrders = document.getElementById('no-current-orders');
+            const pastOrdersDiv = document.getElementById('past-orders');
+            const noPastOrders = document.getElementById('no-past-orders');
+            const currentOrderTotalSection = document.getElementById('current-order-total');
+            const currentTotalAmountSpan = document.getElementById('current-total-amount');
+
+            onAuthStateChanged(auth, async (user) => {
+                if (user) {
+                    const userDocRef = doc(db, "users", user.uid);
+                    try {
+                        const userDocSnap = await getDoc(userDocRef);
+                        if (userDocSnap.exists()) {
+                            const userData = userDocSnap.data();
+                            const currentOrders = userData.orders || [];
+                            const pastOrders = userData.past_orders || [];
+
+                            loadingMessage.style.display = 'none';
+                            ordersContainer.style.display = 'block';
+
+                            // Display Current Orders
+                            if (currentOrders.length > 0) {
+                                noCurrentOrders.style.display = 'none';
+                                currentOrdersDiv.innerHTML = '';
+                                let currentOrderTotalPrice = 0;
+                                currentOrders.forEach(item => {
+                                    const orderItemDiv = document.createElement('div');
+                                    orderItemDiv.classList.add('order-item');
+                                    orderItemDiv.innerHTML = `
+                                        <div class="order-details">${item.title}</div>
+                                        <div class="order-quantity">x${item.quantity}</div>
+                                        <div>$${(item.price * item.quantity).toFixed(2)}</div>
+                                    `;
+                                    currentOrdersDiv.appendChild(orderItemDiv);
+                                    currentOrderTotalPrice += item.price * item.quantity;
+                                });
+                                currentTotalAmountSpan.textContent = currentOrderTotalPrice.toFixed(2);
+                                currentOrderTotalSection.style.display = 'block';
+                            } else {
+                                noCurrentOrders.style.display = 'block';
+                                currentOrderTotalSection.style.display = 'none';
+                            }
+
+                            // Display Past Orders
+                            if (pastOrders && pastOrders.length > 0) {
+                                noPastOrders.style.display = 'none';
+                                pastOrdersDiv.innerHTML = '';
+                                pastOrders.forEach((order, index) => {
+                                    const pastOrderSummary = document.createElement('div');
+                                    pastOrderSummary.classList.add('order-section');
+                                    const orderTitle = document.createElement('h3');
+                                    orderTitle.textContent = `Order #${index + 1} (Past)`;
+                                    pastOrderSummary.appendChild(orderTitle);
+
+                                    const orderItemDiv = document.createElement('div');
+                                    orderItemDiv.classList.add('order-item');
+                                    orderItemDiv.innerHTML = `
+                                        <div class="order-details">${order.title}</div>
+                                        <div class="order-quantity">x${order.quantity}</div>
+                                        <div>$${(order.price * order.quantity).toFixed(2)}</div>
+                                    `;
+                                    pastOrderSummary.appendChild(orderItemDiv);
+
+                                    const pastOrderTotal = document.createElement('p');
+                                    pastOrderTotal.classList.add('order-total');
+                                    pastOrderTotal.innerHTML = `<strong>Total: $${(order.price * order.quantity).toFixed(2)}</strong>`;
+                                    pastOrderSummary.appendChild(pastOrderTotal);
+
+                                    pastOrdersDiv.appendChild(pastOrderSummary);
+                                });
+                            } else {
+                                noPastOrders.style.display = 'block';
+                            }
+
+                        } else {
+                            loadingMessage.style.display = 'none';
+                            errorMessage.textContent = 'Could not retrieve user data.';
+                            errorMessage.style.display = 'block';
+                        }
+                    } catch (error) {
+                        console.error("Error fetching orders:", error);
+                        loadingMessage.style.display = 'none';
+                        errorMessage.textContent = 'Error loading orders.';
+                        errorMessage.style.display = 'block';
+                    }
+                } else {
+                    loadingMessage.style.display = 'none';
+                    errorMessage.textContent = 'Please log in to view your orders.';
+                    errorMessage.style.display = 'block';
+                }
+            });
+
+        } catch (error) {
+            console.error("Firebase initialization error:", error);
+            const loadingMessage = document.getElementById('loading-message');
+            const errorMessage = document.getElementById('error-message');
+            loadingMessage.style.display = 'none';
+            errorMessage.textContent = 'Error initializing Firebase.';
+            errorMessage.style.display = 'block';
+        }
+    </script>
+</body>
+</html>

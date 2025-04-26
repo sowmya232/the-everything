@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product Display</title>
+    <style>
+        .filter-container {
+            display: flex;
+            gap: 10px;
+            padding: 15px;
+            background-color: #f8f8f8;
+            border-bottom: 1px solid #eee;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .filter-container label {
+            font-size: 0.9em;
+            margin-right: 5px;
+        }
+
+        .filter-container select,
+        .filter-container input[type="number"] {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        .product-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            padding: 20px;
+        }
+
+        .product-card {
+            border: 1px solid #ccc;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            width: calc(33.33% - 40px);
+            box-sizing: border-box;
+        }
+
+        @media (max-width: 768px) {
+            .product-card {
+                width: calc(50% - 30px);
+            }
+        }
+
+        @media (max-width: 480px) {
+            .product-card {
+                width: 100%;
+            }
+        }
+
+        .product-card img {
+            max-width: 100%;
+            height: auto;
+            margin-bottom: 10px;
+            border-radius: 4px;
+        }
+
+        .product-card h3 {
+            margin-top: 0;
+            margin-bottom: 8px;
+            font-size: 1.2em;
+        }
+
+        .product-card p {
+            margin-bottom: 6px;
+            font-size: 0.95em;
+            color: #555;
+        }
+
+        .product-card button {
+            margin-top: 10px;
+            padding: 8px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+
+        .add-to-cart-btn {
+            background-color: #007bff;
+            color: white;
+        }
+
+        .add-to-wishlist-btn {
+            background-color: #f0ad4e;
+            color: white;
+            margin-left: 5px;
+        }
+
+        #loading-message {
+            text-align: center;
+            padding: 20px;
+            font-style: italic;
+            color: #777;
+        }
+
+        #error-message {
+            text-align: center;
+            padding: 20px;
+            color: red;
+            font-weight: bold;
+        }
+
+        #login-modal {
+            display: none; /* Hidden by default */
+            position: fixed; /* Stay in place */
+            z-index: 1; /* Sit on top */
+            left: 0;
+            top: 0;
+            width: 100%; /* Full width */
+            height: 100%; /* Full height */
+            overflow: auto; /* Enable scroll if needed */
+            background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto; /* 15% from the top and centered */
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%; /* Could be more or less, depending on screen size */
+            border-radius: 8px;
+            position: relative;
+        }
+
+        .close-button {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        .close-button:hover,
+        .close-button:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .login-form label {
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .login-form input[type="email"],
+        .login-form input[type="password"],
+        .login-form button {
+            width: calc(100% - 22px);
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 1em;
+        }
+
+        .login-form button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        .login-form button:hover {
+            background-color: #0056b3;
+        }
+
+        .login-signup-options {
+            text-align: center;
+            margin-top: 10px;
+            font-size: 0.9em;
+        }
+
+        .login-signup-options a {
+            color: #007bff;
+            text-decoration: none;
+        }
+
+        .login-signup-options a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="filter-container">
+        <label for="category-filter">Category:</label>
+        <select id="category-filter">
+            <option value="">All</option>
+        </select>
+
+        <label for="subcategory-filter">Subcategory:</label>
+        <select id="subcategory-filter">
+            <option value="">All</option>
+        </select>
+
+        <label for="condition-filter">Condition:</label>
+        <select id="condition-filter">
+            <option value="">All</option>
+        </select>
+
+        <label for="location-filter">Location:</label>
+        <select id="location-filter">
+            <option value="">All</option>
+        </select>
+
+        <label for="min-price-filter">Min Price:</label>
+        <input type="number" id="min-price-filter" placeholder="Min">
+
+        <label for="max-price-filter">Max Price:</label>
+        <input type="number" id="max-price-filter" placeholder="Max">
+    </div>
+
+    <div id="products-container" class="product-container">
+        <p id="loading-message">Loading products...</p>
+        <p id="error-message" style="display:none;"></p>
+    </div>
+
+    <div id="login-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2>Login</h2>
+            <form id="login-form" class="login-form">
+                <label for="login-email">Email:</label>
+                <input type="email" id="login-email" required>
+
+                <label for="login-password">Password:</label>
+                <input type="password" id="login-password" required>
+
+                <button type="submit">Login</button>
+            </form>
+            <div class="login-signup-options">
+                Don't have an account? <a href="#">Sign up</a>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
+        import { getFirestore, collection, getDocs, doc, getDoc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+        import { getAuth, onAuthStateChanged, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
+
+        // Your Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCk3NBT-ZqDYQSJVYixqt05BT4pg1Odl-4",
+            authDomain: "admin-login-signup.firebaseapp.com",
+            projectId: "admin-login-signup",
+            storageBucket: "admin-login-signup.firebasestorage.app",
+            messagingSenderId: "524139872298",
+            appId: "1:524139872298:web:fbd21b59812e5920b40353"
+        };
+
+        try {
+            const app = initializeApp(firebaseConfig);
+            const db = getFirestore(app);
+            const auth = getAuth(app);
+            const productsCollection = collection(db, "products");
+            const usersCollection = collection(db, "users");
+            const productsContainer = document.getElementById('products-container');
+            const loadingMessage = document.getElementById('loading-message');
+            const errorMessage = document.getElementById('error-message');
+            const categoryFilter = document.getElementById('category-filter');
+            const subcategoryFilter = document.getElementById('subcategory-filter');
+            const conditionFilter = document.getElementById('condition-filter');
+            const locationFilter = document.getElementById('location-filter');
+            const minPriceFilter = document.getElementById('min-price-filter');
+            const maxPriceFilter = document.getElementById('max-price-filter');
+            const loginModal = document.getElementById('login-modal');
+            const closeButton = loginModal.querySelector('.close-button');
+            const loginForm = document.getElementById('login-form');
+
+            let allProducts = [];
+            let currentFilters = {};
+            let currentUser = null;
+
+            onAuthStateChanged(auth, (user) => {
+                currentUser = user;
+            });
+
+            closeButton.addEventListener('click', () => {
+                loginModal.style.display = "none";
+            });
+
+            window.addEventListener('click', (event) => {
+                if (event.target == loginModal) {
+                    loginModal.style.display = "none";
+                }
+            });
+
+            loginForm.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const email = loginForm.querySelector('#login-email').value;
+                const password = loginForm.querySelector('#login-password').value;
+
+                try {
+                    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                    currentUser = userCredential.user;
+                    loginModal.style.display = "none";
+                    alert("Login successful!");
+                    // Optionally, you can redirect the user or perform other actions after login
+                } catch (error) {
+                    alert("Login failed: " + error.message);
+                }
+            });
+
+            async function ensureUserDocumentExists(userId) {
+                const userDocRef = doc(db, "users", userId);
+                const userDocSnap = await getDoc(userDocRef);
+
+                if (!userDocSnap.exists()) {
+                    await setDoc(userDocRef, {
+                        cart: [],
+                        wishlist: [],
+                        orders: [],
+                        past_orders: []
+                    });
+                }
+            }
+
+            async function updateCart(userId, productId, add = true) {
+                if (!userId) return;
+                const userDocRef = doc(db, "users", userId);
+                const userDocSnap = await getDoc(userDocRef);
+
+                if (userDocSnap.exists()) {
+                    const userData = userDocSnap.data();
+                    let cart = userData.cart || [];
+                    if (add && !cart.includes(productId)) {
+                        cart.push(productId);
+                        await updateDoc(userDocRef, { cart: cart });
+                        alert("Added to cart!");
+                    } else if (!add && cart.includes(productId)) {
+                        cart = cart.filter(id => id !== productId);
+                        await updateDoc(userDocRef, { cart: cart });
+                        alert("Removed from cart!");
+                    } else if (add) {
+                        alert("Product already in cart!");
+                    }
+                }
+            }
+
+            async function addToCart(productId) {
+                if (currentUser) {
+                    await ensureUserDocumentExists(currentUser.uid);
+                    await updateCart(currentUser.uid, productId, true);
+                } else {
+                    loginModal.style.display = "block";
+                }
+            }
+
+            async function updateWishlist(userId, productId, add = true) {
+                if (!userId) return;
+                const userDocRef = doc(db, "users", userId);
+                const userDocSnap = await getDoc(userDocRef);
+
+                if (userDocSnap.exists()) {
+                    const userData = userDocSnap.data();
+                    let wishlist = userData.wishlist || [];
+                    if (add && !wishlist.includes(productId)) {
+                        wishlist.push(productId);
+                        await updateDoc(userDocRef, { wishlist: wishlist });
+                        alert("Added to wishlist!");
+                    } else if (!add && wishlist.includes(productId)) {
+                        wishlist = wishlist.filter(id => id !== productId);
+                        await updateDoc(userDocRef, { wishlist: wishlist });
+                        alert("Removed from wishlist!");
+                    } else if (add) {
+                        alert("Product already in wishlist!");
+                    }
+                }
+            }
+
+            async function addToWishlist(productId) {
+                if (currentUser) {
+                    await ensureUserDocumentExists(currentUser.uid);
+                    await updateWishlist(currentUser.uid, productId, true);
+                } else {
+                    loginModal.style.display = "block";
+                }
+            }
+
+            function renderProducts(products) {
+                productsContainer.innerHTML = ''; // Clear existing products
+                if (products.length === 0) {
+                    productsContainer.innerHTML = '<p>No products match your filters.</p>';
+                    return;
+                }
+
+                products.forEach((product) => {
+                    const productCard = document.createElement('div');
+                    productCard.classList.add('product-card');
+
+                    const image = document.createElement('img');
+                    image.src = product.imageUrl || 'https://via.placeholder.com/150';
+                    image.alt = product.title || 'Product Image';
+
+                    const title = document.createElement('h3');
+                    title.textContent = product.title || 'No Title';
+
+                    const price = document.createElement('p');
+                    price.textContent = `Price: $${product.price || 'N/A'}`;
+
+                    const condition = document.createElement('p');
+                    condition.textContent = `Condition: ${product.condition || 'N/A'}`;
+
+                    const location = document.createElement('p');
+                    location.textContent = `Location: ${product.location || 'N/A'}`;
+
+                    const description = document.createElement('p');
+                    description.textContent = product.description || 'No description provided.';
+
+                    const addToCartButton = document.createElement('button');
+                    addToCartButton.classList.add('add-to-cart-btn');
+                    addToCartButton.textContent = 'Add to Cart';
+                    addToCartButton.addEventListener('click', () => addToCart(product.id));
+
+                    const addToWishlistButton = document.createElement('button');
+                    addToWishlistButton.classList.add('add-to-wishlist-btn');
+                    addToWishlistButton.textContent = 'Wishlist';
+                    addToWishlistButton.addEventListener('click', () => addToWishlist(product.id));
+
+                    productCard.appendChild(image);
+                    productCard.appendChild(title);
+                    productCard.appendChild(price);
+                    productCard.appendChild(condition);
+                    productCard.appendChild(location);
+                    productCard.appendChild(description);
+                    productCard.appendChild(addToCartButton);
+                    productCard.appendChild(addToWishlistButton);
+
+                    productsContainer.appendChild(productCard);
+                });
+            }
+
+            function filterProducts() {
+                const filteredProducts = allProducts.filter(product => {
+                    const categoryMatch = !currentFilters.category || product.category === currentFilters.category;
+                    const subcategoryMatch = !currentFilters.subcategory || product.subcategory === currentFilters.subcategory;
+                    const conditionMatch = !currentFilters.condition || product.condition === currentFilters.condition;
+                    const locationMatch = !currentFilters.location || product.location === currentFilters.location;
+                    const priceMatch =
+                        (!currentFilters.minPrice || (product.price && product.price >= (currentFilters.minPrice === null ? -Infinity : currentFilters.minPrice))) &&
+                        (!currentFilters.maxPrice || (product.price && product.price <= (currentFilters.maxPrice === null ? Infinity : currentFilters.maxPrice)));
+                    return categoryMatch && subcategoryMatch && conditionMatch && locationMatch && priceMatch;
+                });
+                renderProducts(filteredProducts);
+            }
+
+            function updateFilters(filterName, value) {
+                currentFilters[filterName] = value;
+                filterProducts();
+            }
+
+            categoryFilter.addEventListener('change', (event) => updateFilters('category', event.target.value));
+            subcategoryFilter.addEventListener('change', (event) => updateFilters('subcategory', event.target.value));
+            conditionFilter.addEventListener('change', (event) => updateFilters('condition', event.target.value));
+            locationFilter.addEventListener('change', (event) => updateFilters('location', event.target.value));
+            minPriceFilter.addEventListener('input', (event) => updateFilters('minPrice', event.target.value ? parseFloat(event.target.value) : null));
+            maxPriceFilter.addEventListener('input', (event) => updateFilters('maxPrice', event.target.value ? parseFloat(event.target.value) : null));
+
+
+            async function fetchProducts() {
+                try {
+                    const querySnapshot = await getDocs(productsCollection);
+                    loadingMessage.style.display = 'none';
+
+                    if (querySnapshot.empty) {
+                        productsContainer.innerHTML = '<p>No products available.</p>';
+                        return;
+                    }
+
+                    const categories = new Set();
+                    const subcategories = new Set();
+                    const conditions = new Set();
+                    const locations = new Set();
+
+                    allProducts = querySnapshot.docs.map(doc => {
+                        const data = doc.data();
+                        const product = { id: doc.id, ...data };
+                        if (data.category) categories.add(data.category);
+                        if (data.subcategory) subcategories.add(data.subcategory);
+                        if (data.condition) conditions.add(data.condition);
+                        if (data.location) locations.add(data.location);
+                        return product;
+                    });
+
+                    // Populate filter options
+                    categories.forEach(category => {
+                        const option = document.createElement('option');
+                        option.value = category;
+                        option.textContent = category;
+                        categoryFilter.appendChild(option);
+                    });
+
+                    subcategories.forEach(subcategory => {
+                        const option = document.createElement('option');
+                        option.value = subcategory;
+                        option.textContent = subcategory;
+                        subcategoryFilter.appendChild(option);
+                    });
+
+                    conditions.forEach(condition => {
+                        const option = document.createElement('option');
+                        option.value = condition;
+                        option.textContent = condition;
+                        conditionFilter.appendChild(option);
+                    });
+
+                    locations.forEach(location => {
+                        const option = document.createElement('option');
+                        option.value = location;
+                        option.textContent = location;
+                        locationFilter.appendChild(option);
+                    });
+
+                    renderProducts(allProducts);
+
+                } catch (error) {
+                    console.error("Error fetching products:", error);
+                    loadingMessage.style.display = 'none';
+                    errorMessage.textContent = 'Error loading products.';
+                    errorMessage.style.display = 'block';
+                }
+            }
+
+            fetchProducts();
+
+        } catch (error) {
+            console.error("Firebase initialization error:", error);
+            const loadingMessage = document.getElementById('loading-message');
+            const errorMessage = document.getElementById('error-message');
+            loadingMessage.style.display = 'none';
+            errorMessage.textContent = 'Error initializing Firebase.';
+            errorMessage.style.display = 'block';
+        }
+    </script>
+</body>
+</html>

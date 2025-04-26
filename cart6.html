@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shopping Cart</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .cart-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .cart-item {
+            display: flex;
+            border: 1px solid #ccc;
+            margin-bottom: 15px;
+            padding: 10px;
+            border-radius: 8px;
+            align-items: center;
+        }
+
+        .cart-item img {
+            max-width: 100px;
+            height: auto;
+            margin-right: 15px;
+            border-radius: 4px;
+        }
+
+        .item-details {
+            flex-grow: 1;
+        }
+
+        .item-details h3 {
+            margin-top: 0;
+            margin-bottom: 5px;
+            font-size: 1.1em;
+        }
+
+        .item-details p {
+            margin-bottom: 5px;
+            color: #555;
+            font-size: 0.9em;
+        }
+
+        .quantity-controls {
+            display: flex;
+            align-items: center;
+            margin-right: 15px;
+        }
+
+        .quantity-controls button {
+            padding: 5px 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8em;
+        }
+
+        .quantity-controls span {
+            margin: 0 10px;
+            font-size: 1em;
+        }
+
+        .remove-button {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+
+        .remove-button:hover {
+            background-color: #c82333;
+        }
+
+        .cart-summary {
+            text-align: right;
+            margin-top: 20px;
+            padding: 15px;
+            border-top: 1px solid #eee;
+        }
+
+        .cart-summary h2 {
+            margin-top: 0;
+            font-size: 1.2em;
+            margin-bottom: 10px;
+        }
+
+        .cart-summary p {
+            font-size: 1em;
+            margin-bottom: 5px;
+        }
+
+        .cart-summary strong {
+            font-weight: bold;
+        }
+
+        #empty-cart {
+            text-align: center;
+            padding: 20px;
+            font-style: italic;
+            color: #777;
+        }
+    </style>
+</head>
+<body>
+    <div class="cart-container">
+        <h1>Shopping Cart</h1>
+        <div id="cart-items-container">
+            <p id="loading-message">Loading cart...</p>
+            <p id="empty-cart" style="display:none;">Your cart is empty.</p>
+            <p id="error-message" style="display:none; color: red; font-weight: bold;">Error loading cart.</p>
+        </div>
+        <div id="cart-summary" style="display:none;" class="cart-summary">
+            <h2>Cart Summary</h2>
+            <p>Subtotal: <strong id="subtotal">$0.00</strong></p>
+            <button id="checkout-button">Proceed to Checkout</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
+        import { getFirestore, collection, getDocs, doc, getDoc, updateDoc, arrayUnion, setDoc } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
+
+        // Your Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCk3NBT-ZqDYQSJVYixqt05BT4pg1Odl-4",
+            authDomain: "admin-login-signup.firebaseapp.com",
+            projectId: "admin-login-signup",
+            storageBucket: "admin-login-signup.firebasestorage.app",
+            messagingSenderId: "524139872298",
+            appId: "1:524139872298:web:fbd21b59812e5920b40353"
+        };
+
+        try {
+            const app = initializeApp(firebaseConfig);
+            const db = getFirestore(app);
+            const auth = getAuth(app);
+            const productsCollection = collection(db, "products");
+            const usersCollection = collection(db, "users");
+            const cartItemsContainer = document.getElementById('cart-items-container');
+            const cartSummary = document.getElementById('cart-summary');
+            const subtotalElement = document.getElementById('subtotal');
+            const loadingMessage = document.getElementById('loading-message');
+            const emptyCartMessage = document.getElementById('empty-cart');
+            const errorMessage = document.getElementById('error-message');
+            const checkoutButton = document.getElementById('checkout-button'); // Get the checkout button
+
+            let currentUser = null;
+            let cartProductDetails = [];
+
+            onAuthStateChanged(auth, async (user) => {
+                currentUser = user;
+                if (currentUser) {
+                    await fetchCartItems();
+                } else {
+                    loadingMessage.style.display = 'none';
+                    emptyCartMessage.style.display = 'block';
+                    cartSummary.style.display = 'none';
+                }
+            });
+
+            async function getProductDetails(productId) {
+                const productDoc = await getDoc(doc(db, "products", productId));
+                if (productDoc.exists()) {
+                    return { id: productDoc.id, ...productDoc.data() };
+                }
+                return null;
+            }
+
+            async function fetchCartItems() {
+                if (!currentUser) return;
+
+                try {
+                    const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+                    if (userDoc.exists()) {
+                        const cartItems = userDoc.data().cart || [];
+
+                        if (cartItems.length === 0) {
+                            loadingMessage.style.display = 'none';
+                            emptyCartMessage.style.display = 'block';
+                            cartSummary.style.display = 'none';
+                            return;
+                        }
+
+                        cartProductDetails = [];
+                        for (const productId of cartItems) {
+                            const details = await getProductDetails(productId);
+                            if (details) {
+                                cartProductDetails.push({ product: details, quantity: 1 }); // Initial quantity is 1
+                            }
+                        }
+                        loadingMessage.style.display = 'none';
+                        renderCartItems();
+                        cartSummary.style.display = 'block';
+
+                    } else {
+                        loadingMessage.style.display = 'none';
+                        emptyCartMessage.style.display = 'block';
+                        cartSummary.style.display = 'none';
+                    }
+                } catch (error) {
+                    console.error("Error fetching cart:", error);
+                    loadingMessage.style.display = 'none';
+                    errorMessage.style.display = 'block';
+                    cartSummary.style.display = 'none';
+                }
+            }
+
+            async function updateQuantity(productId, change) {
+                const itemIndex = cartProductDetails.findIndex(item => item.product.id === productId);
+                if (itemIndex !== -1) {
+                    cartProductDetails[itemIndex].quantity += change;
+                    if (cartProductDetails[itemIndex].quantity < 1) {
+                        cartProductDetails[itemIndex].quantity = 1; // Ensure quantity doesn't go below 1
+                    }
+                    renderCartItems();
+                    await updateCartInFirestore();
+                }
+            }
+
+            async function removeItem(productId) {
+                cartProductDetails = cartProductDetails.filter(item => item.product.id !== productId);
+                renderCartItems();
+                await updateCartInFirestore();
+                if (cartProductDetails.length === 0) {
+                    emptyCartMessage.style.display = 'block';
+                    cartSummary.style.display = 'none';
+                }
+            }
+
+            async function updateCartInFirestore() {
+                if (!currentUser) return;
+                const updatedCart = cartProductDetails.map(item => item.product.id);
+                const userDocRef = doc(db, "users", currentUser.uid);
+                await updateDoc(userDocRef, { cart: updatedCart });
+                calculateSubtotal();
+            }
+
+            function renderCartItems() {
+                cartItemsContainer.innerHTML = '';
+                cartProductDetails.forEach(item => {
+                    const cartItemDiv = document.createElement('div');
+                    cartItemDiv.classList.add('cart-item');
+
+                    const img = document.createElement('img');
+                    img.src = item.product.imageUrl || 'https://via.placeholder.com/50';
+                    img.alt = item.product.title || 'Product Image';
+
+                    const detailsDiv = document.createElement('div');
+                    detailsDiv.classList.add('item-details');
+                    const title = document.createElement('h3');
+                    title.textContent = item.product.title || 'No Title';
+                    const price = document.createElement('p');
+                    price.textContent = `$${item.product.price || 'N/A'}`;
+                    detailsDiv.appendChild(title);
+                    detailsDiv.appendChild(price);
+
+                    const quantityControls = document.createElement('div');
+                    quantityControls.classList.add('quantity-controls');
+                    const decreaseButton = document.createElement('button');
+                    decreaseButton.textContent = '-';
+                    decreaseButton.addEventListener('click', () => updateQuantity(item.product.id, -1));
+                    const quantitySpan = document.createElement('span');
+                    quantitySpan.textContent = item.quantity;
+                    const increaseButton = document.createElement('button');
+                    increaseButton.textContent = '+';
+                    increaseButton.addEventListener('click', () => updateQuantity(item.product.id, 1));
+                    quantityControls.appendChild(decreaseButton);
+                    quantityControls.appendChild(quantitySpan);
+                    quantityControls.appendChild(increaseButton);
+
+                    const removeButton = document.createElement('button');
+                    removeButton.classList.add('remove-button');
+                    removeButton.textContent = 'Remove';
+                    removeButton.addEventListener('click', () => removeItem(item.product.id));
+
+                    cartItemDiv.appendChild(img);
+                    cartItemDiv.appendChild(detailsDiv);
+                    cartItemDiv.appendChild(quantityControls);
+                    cartItemDiv.appendChild(removeButton);
+
+                    cartItemsContainer.appendChild(cartItemDiv);
+                });
+                calculateSubtotal();
+            }
+
+            function calculateSubtotal() {
+                let subtotal = 0;
+                cartProductDetails.forEach(item => {
+                    if (item.product.price) {
+                        subtotal += item.product.price * item.quantity;
+                    }
+                });
+                subtotalElement.textContent = `$${subtotal.toFixed(2)}`;
+            }
+
+
+            
+if (checkoutButton) {
+                    checkoutButton.addEventListener('click', async () => {
+                        if (currentUser && cartProductDetails.length > 0) {
+                            const userDocRef = doc(db, "users", currentUser.uid);
+                            const userDocSnap = await getDoc(userDocRef);
+    
+                            if (userDocSnap.exists()) {
+                                const userData = userDocSnap.data();
+                                const currentOrders = userData.orders || [];
+    
+                                // Move existing orders to past_orders if there are any
+                                if (currentOrders.length > 0) {
+                                    await updateDoc(userDocRef, {
+                                        past_orders: arrayUnion(...currentOrders),
+                                        orders: [] // Empty the current orders array
+                                    });
+                                } else {
+                                    // If orders array is already empty, no need to move
+                                    await updateDoc(userDocRef, {
+                                        orders: [] // Ensure it's empty before adding new order
+                                    });
+                                }
+    
+                                const newOrderItems = cartProductDetails.map(item => ({
+                                    productId: item.product.id,
+                                    title: item.product.title,
+                                    price: item.product.price,
+                                    quantity: item.quantity
+                                }));
+    
+                                // Add the current cart items to the orders array
+                                await updateDoc(userDocRef, {
+                                    orders: arrayUnion(...newOrderItems),
+                                    cart: [] // Empty the cart
+                                });
+    
+                                alert("Order placed successfully! Cart has been emptied.");
+    
+                                // Update the local cart display
+                                cartProductDetails = [];
+                                renderCartItems();
+                                emptyCartMessage.style.display = 'block';
+                                cartSummary.style.display = 'none';
+    
+                            }
+                        } else if (!currentUser) {
+                            alert("Please log in to place an order.");
+                        } else {
+                            alert("Your cart is empty. Nothing to order.");
+                        }
+                    });
+                }
+
+        } catch (error) {
+            console.error("Firebase initialization error:", error);
+            const loadingMessage = document.getElementById('loading-message');
+            const errorMessage = document.getElementById('error-message');
+            loadingMessage.style.display = 'none';
+            errorMessage.textContent = 'Error initializing Firebase.';
+            errorMessage.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
+
